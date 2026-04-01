@@ -183,8 +183,10 @@ async function uploadListingImage(file: File) {
   setNotice("Image uploaded.");
 }
   async function createListing() {
-    if (!newListing.title || !newListing.description || !newListing.pickup) return;
-
+if (!newListing.title || !newListing.description || !newListing.pickup) {
+  setNotice("Please fill in title, description, and pickup details.");
+  return;
+}
     const payload = {
       title: newListing.title,
       description: newListing.description,
@@ -524,178 +526,177 @@ async function uploadListingImage(file: File) {
           </section>
         )}
 
-        {tab === "create" && (
-          <section className="rounded-3xl bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-6">
-              <h2 className="text-2xl font-semibold">Post an item for the family</h2>
-            </div>
-
-            <div className="grid gap-6 p-6 md:grid-cols-2">
-              <div className="space-y-4">
-                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                  Keep it simple: add a clear title, a short honest description, and pickup instructions.
-                </div>
-
-<div>
-  <label className="block text-sm font-medium">Photo upload</label>
-<input
-  type="file"
-  accept=".jpg,.jpeg,.png,.webp"
-  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-  onChange={async (e) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    // basic file type guard
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) {
-      setNotice("Please upload JPG, JPEG, PNG, or WebP images.");
-      return;
-    }
-
-    await uploadListingImage(file);
-  }}
-/>
-<p className="mt-2 text-sm text-slate-500">
-  Use JPG, JPEG, PNG, or WebP. iPhone HEIC photos are not supported yet.
-</p>
-  {uploadingImage ? (
-    <p className="mt-2 text-sm text-slate-500">Uploading image...</p>
-  ) : null}
-  {newListing.photoUrl ? (
-    <div className="mt-3">
-      <img
-        src={newListing.photoUrl}
-        alt="Preview"
-        className="h-32 w-32 rounded-xl object-cover"
-      />
+{tab === "create" && (
+  <section className="rounded-3xl bg-white shadow-sm">
+    <div className="border-b border-slate-200 p-6">
+      <h2 className="text-2xl font-semibold">Post an item for the family</h2>
     </div>
-  ) : null}
-</div>
-                <div>
-                  <label className="block text-sm font-medium">Description</label>
-                  <textarea
-                    className="mt-2 min-h-[140px] w-full rounded-xl border border-slate-300 px-3 py-2"
-                    value={newListing.description}
-                    onChange={(e) => setNewListing({ ...newListing, description: e.target.value })}
-                    placeholder="Condition, size, brand, wear, and anything family should know before claiming it."
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium">Photo URL</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                    value={newListing.photoUrl}
-                    onChange={(e) => setNewListing({ ...newListing, photoUrl: e.target.value })}
-                    placeholder="Paste an image URL for this MVP"
-                  />
-                </div>
-              </div>
+    <div className="grid gap-6 p-6 md:grid-cols-2">
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+          Keep it simple: add a clear title, a short honest description, and pickup instructions.
+        </div>
 
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium">Listing type</label>
-                    <select
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.priceType}
-                      onChange={(e) => setNewListing({ ...newListing, priceType: e.target.value })}
-                    >
-                      <option value="paid">For sale</option>
-                      <option value="free">Free</option>
-                    </select>
-                  </div>
+        <div>
+          <label className="block text-sm font-medium">Item title</label>
+          <input
+            className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+            value={newListing.title}
+            onChange={(e) => setNewListing({ ...newListing, title: e.target.value })}
+            placeholder="Coffee table, stroller, drill set..."
+          />
+        </div>
 
-                  <div>
-                    <label className="block text-sm font-medium">Category</label>
-                    <input
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.category}
-                      onChange={(e) => setNewListing({ ...newListing, category: e.target.value })}
-                      placeholder="Furniture"
-                    />
-                  </div>
-                </div>
+        <div>
+          <label className="block text-sm font-medium">Description</label>
+          <textarea
+            className="mt-2 min-h-[140px] w-full rounded-xl border border-slate-300 px-3 py-2"
+            value={newListing.description}
+            onChange={(e) => setNewListing({ ...newListing, description: e.target.value })}
+            placeholder="Condition, size, brand, wear, and anything family should know before claiming it."
+          />
+        </div>
 
-                {newListing.priceType === "paid" ? (
-                  <div>
-                    <label className="block text-sm font-medium">Asking price</label>
-                    <input
-                      type="number"
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.price}
-                      onChange={(e) => setNewListing({ ...newListing, price: e.target.value })}
-                      placeholder="75"
-                    />
-                  </div>
-                ) : null}
+        <div>
+          <label className="block text-sm font-medium">Photo upload</label>
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
 
-                <div>
-                  <label className="block text-sm font-medium">Pickup details</label>
-                  <textarea
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                    value={newListing.pickup}
-                    onChange={(e) => setNewListing({ ...newListing, pickup: e.target.value })}
-                    placeholder="Porch pickup, town, available days, meetup options..."
-                  />
-                </div>
+              if (!file) return;
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label className="block text-sm font-medium">Expires in days</label>
-                    <input
-                      type="number"
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.expiresInDays}
-                      onChange={(e) =>
-                        setNewListing({ ...newListing, expiresInDays: Number(e.target.value) })
-                      }
-                    />
-                  </div>
+              const validTypes = ["image/jpeg", "image/png", "image/webp"];
+              if (!validTypes.includes(file.type)) {
+                setNotice("Please upload JPG, JPEG, PNG, or WebP images.");
+                return;
+              }
 
-                  <div>
-                    <label className="block text-sm font-medium">Buy now / claim</label>
-                    <select
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.allowBuyNow ? "yes" : "no"}
-                      onChange={(e) =>
-                        setNewListing({ ...newListing, allowBuyNow: e.target.value === "yes" })
-                      }
-                    >
-                      <option value="yes">Enabled</option>
-                      <option value="no">Disabled</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium">Offers</label>
-                    <select
-                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                      value={newListing.allowOffers ? "yes" : "no"}
-                      onChange={(e) =>
-                        setNewListing({ ...newListing, allowOffers: e.target.value === "yes" })
-                      }
-                    >
-                      <option value="yes">Enabled</option>
-                      <option value="no">Disabled</option>
-                    </select>
-                  </div>
-                </div>
-
-<button
-  className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white disabled:opacity-50"
-  onClick={createListing}
-  disabled={uploadingImage}
->
-  {uploadingImage ? "Uploading image..." : "Publish listing"}
-</button>
-              </div>
+              await uploadListingImage(file);
+            }}
+          />
+          <p className="mt-2 text-sm text-slate-500">
+            Use JPG, JPEG, PNG, or WebP. iPhone HEIC photos are not supported yet.
+          </p>
+          {uploadingImage ? (
+            <p className="mt-2 text-sm text-slate-500">Uploading image...</p>
+          ) : null}
+          {newListing.photoUrl ? (
+            <div className="mt-3">
+              <img
+                src={newListing.photoUrl}
+                alt="Preview"
+                className="h-32 w-32 rounded-xl object-cover"
+              />
             </div>
-          </section>
-        )}
+          ) : null}
+        </div>
+      </div>
 
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium">Listing type</label>
+            <select
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.priceType}
+              onChange={(e) => setNewListing({ ...newListing, priceType: e.target.value })}
+            >
+              <option value="paid">For sale</option>
+              <option value="free">Free</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Category</label>
+            <input
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.category}
+              onChange={(e) => setNewListing({ ...newListing, category: e.target.value })}
+              placeholder="Furniture"
+            />
+          </div>
+        </div>
+
+        {newListing.priceType === "paid" ? (
+          <div>
+            <label className="block text-sm font-medium">Asking price</label>
+            <input
+              type="number"
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.price}
+              onChange={(e) => setNewListing({ ...newListing, price: e.target.value })}
+              placeholder="75"
+            />
+          </div>
+        ) : null}
+
+        <div>
+          <label className="block text-sm font-medium">Pickup details</label>
+          <textarea
+            className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+            value={newListing.pickup}
+            onChange={(e) => setNewListing({ ...newListing, pickup: e.target.value })}
+            placeholder="Porch pickup, town, available days, meetup options..."
+          />
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="block text-sm font-medium">Expires in days</label>
+            <input
+              type="number"
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.expiresInDays}
+              onChange={(e) =>
+                setNewListing({ ...newListing, expiresInDays: Number(e.target.value) })
+              }
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Buy now / claim</label>
+            <select
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.allowBuyNow ? "yes" : "no"}
+              onChange={(e) =>
+                setNewListing({ ...newListing, allowBuyNow: e.target.value === "yes" })
+              }
+            >
+              <option value="yes">Enabled</option>
+              <option value="no">Disabled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Offers</label>
+            <select
+              className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+              value={newListing.allowOffers ? "yes" : "no"}
+              onChange={(e) =>
+                setNewListing({ ...newListing, allowOffers: e.target.value === "yes" })
+              }
+            >
+              <option value="yes">Enabled</option>
+              <option value="no">Disabled</option>
+            </select>
+          </div>
+        </div>
+
+        <button
+          className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white disabled:opacity-50"
+          onClick={createListing}
+          disabled={uploadingImage}
+        >
+          {uploadingImage ? "Uploading image..." : "Publish listing"}
+        </button>
+      </div>
+    </div>
+  </section>
+)}
         {tab === "manage" && (
           <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-3xl bg-white shadow-sm">
