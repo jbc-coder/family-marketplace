@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type Offer = {
   id: string;
@@ -14,97 +15,25 @@ type Listing = {
   id: string;
   title: string;
   description: string;
-  priceType: "paid" | "free";
+  price_type: "paid" | "free";
   price: number;
   pickup: string;
   seller: string;
   category: string;
   photos: string[];
-  allowOffers: boolean;
-  allowBuyNow: boolean;
-  createdAt: number;
-  expiresAt: number;
+  allow_offers: boolean;
+  allow_buy_now: boolean;
+  created_at: string;
+  expires_at: string;
   status: "active" | "expired" | "sold" | "claimed";
   offers: Offer[];
-  claimedBy: string | null;
+  claimed_by: string | null;
 };
 
-const STORAGE_KEY = "family-marketplace-mvp-v3";
 const APP_NAME = "Family First Marketplace";
 const APP_TAGLINE = "Give family first shot before it gets donated or consigned.";
 
 const seedUsers = ["Jared", "Ashley", "Mom", "Dad", "Aunt Lisa", "Cousin Ben"];
-
-const seedListings: Listing[] = [
-  {
-    id: crypto.randomUUID(),
-    title: "Solid wood coffee table",
-    description: "Good condition. A few scratches on the top but still sturdy and nice.",
-    priceType: "paid",
-    price: 75,
-    pickup: "Front porch pickup in Highland Lake",
-    seller: "Mom",
-    category: "Furniture",
-    photos: [
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop",
-    ],
-    allowOffers: true,
-    allowBuyNow: true,
-    createdAt: Date.now() - 1000 * 60 * 60 * 6,
-    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 4,
-    status: "active",
-    offers: [
-      {
-        id: crypto.randomUUID(),
-        by: "Ashley",
-        amount: 55,
-        note: "Can pick up Saturday morning.",
-        createdAt: Date.now() - 1000 * 60 * 60 * 2,
-      },
-    ],
-    claimedBy: null,
-  },
-  {
-    id: crypto.randomUUID(),
-    title: "Baby clothes bundle",
-    description: "Mostly 3–6 month sizes. Free to a family member who can use them.",
-    priceType: "free",
-    price: 0,
-    pickup: "Pickup in Birmingham next week or I can bring to family lunch.",
-    seller: "Ashley",
-    category: "Kids",
-    photos: [
-      "https://images.unsplash.com/photo-1519238359922-989348752efb?q=80&w=1200&auto=format&fit=crop",
-    ],
-    allowOffers: false,
-    allowBuyNow: true,
-    createdAt: Date.now() - 1000 * 60 * 90,
-    expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 10,
-    status: "active",
-    offers: [],
-    claimedBy: null,
-  },
-  {
-    id: crypto.randomUUID(),
-    title: "Acoustic guitar stand",
-    description: "Works fine. I switched to wall hangers and do not need this anymore.",
-    priceType: "paid",
-    price: 15,
-    pickup: "Porch pickup only",
-    seller: "Dad",
-    category: "Music",
-    photos: [
-      "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=1200&auto=format&fit=crop",
-    ],
-    allowOffers: true,
-    allowBuyNow: true,
-    createdAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
-    expiresAt: Date.now() - 1000 * 60 * 60 * 6,
-    status: "expired",
-    offers: [],
-    claimedBy: null,
-  },
-];
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -113,12 +42,12 @@ function money(value: number) {
   }).format(value || 0);
 }
 
-function formatDate(ts: number) {
+function formatDate(ts: string) {
   return new Date(ts).toLocaleString();
 }
 
-function getRemainingText(expiresAt: number) {
-  const diff = expiresAt - Date.now();
+function getRemainingText(expiresAt: string) {
+  const diff = new Date(expiresAt).getTime() - Date.now();
   if (diff <= 0) return "Expired";
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
@@ -130,7 +59,7 @@ function getRemainingText(expiresAt: number) {
 function getStatus(listing: Listing) {
   if (listing.status === "sold") return "sold";
   if (listing.status === "claimed") return "claimed";
-  if (listing.expiresAt <= Date.now()) return "expired";
+  if (new Date(listing.expires_at).getTime() <= Date.now()) return "expired";
   return "active";
 }
 
@@ -143,7 +72,8 @@ function badgeClass(status: string) {
 
 export default function Page() {
   const [currentUser, setCurrentUser] = useState("Jared");
-  const [listings, setListings] = useState<Listing[]>(seedListings);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -165,41 +95,28 @@ export default function Page() {
     expiresInDays: 14,
   });
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed?.listings?.length) setListings(parsed.listings);
-        if (parsed?.currentUser) setCurrentUser(parsed.currentUser);
-      } catch {}
+  async function loadListings() {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("listings")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setListings(data as Listing[]);
     }
-  }, []);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ listings, currentUser }));
-  }, [listings, currentUser]);
+    loadListings();
+  }, []);
 
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 2600);
     return () => clearTimeout(timer);
   }, [notice]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setListings((prev) =>
-        prev.map((item) => {
-          if (item.status === "sold" || item.status === "claimed") return item;
-          if (item.expiresAt <= Date.now() && item.status !== "expired") {
-            return { ...item, status: "expired" };
-          }
-          return item;
-        }),
-      );
-    }, 30000);
-    return () => clearInterval(timer);
-  }, []);
 
   const categories = useMemo(() => {
     const values = Array.from(new Set(listings.map((x) => x.category))).sort();
@@ -216,8 +133,8 @@ export default function Page() {
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
       const matchesType =
         typeFilter === "all" ||
-        (typeFilter === "free" && item.priceType === "free") ||
-        (typeFilter === "paid" && item.priceType === "paid");
+        (typeFilter === "free" && item.price_type === "free") ||
+        (typeFilter === "paid" && item.price_type === "paid");
 
       return matchesQuery && matchesCategory && matchesType;
     });
@@ -225,25 +142,24 @@ export default function Page() {
 
   const activeListings = filteredListings.filter((x) => getStatus(x) === "active");
   const activeAll = listings.filter((x) => getStatus(x) === "active");
-  const freeCount = activeAll.filter((x) => x.priceType === "free").length;
-  const saleCount = activeAll.filter((x) => x.priceType === "paid").length;
+  const freeCount = activeAll.filter((x) => x.price_type === "free").length;
+  const saleCount = activeAll.filter((x) => x.price_type === "paid").length;
   const myListings = listings.filter((x) => x.seller === currentUser);
   const expiringSoon = listings.filter(
-    (x) => getStatus(x) === "active" && x.expiresAt - Date.now() < 1000 * 60 * 60 * 24 * 2,
+    (x) => getStatus(x) === "active" && new Date(x.expires_at).getTime() - Date.now() < 1000 * 60 * 60 * 24 * 2
   );
   const myOpenOffers = listings.reduce(
-    (sum, item) => sum + item.offers.filter((o) => o.by === currentUser).length,
-    0,
+    (sum, item) => sum + (item.offers || []).filter((o) => o.by === currentUser).length,
+    0
   );
 
-  function createListing() {
+  async function createListing() {
     if (!newListing.title || !newListing.description || !newListing.pickup) return;
 
-    const listing: Listing = {
-      id: crypto.randomUUID(),
+    const payload = {
       title: newListing.title,
       description: newListing.description,
-      priceType: newListing.priceType as "paid" | "free",
+      price_type: newListing.priceType,
       price: newListing.priceType === "free" ? 0 : Number(newListing.price || 0),
       pickup: newListing.pickup,
       seller: currentUser,
@@ -252,60 +168,63 @@ export default function Page() {
         newListing.photoUrl ||
           "https://images.unsplash.com/photo-1480074568708-e7b720bb3f09?q=80&w=1200&auto=format&fit=crop",
       ],
-      allowOffers: newListing.priceType === "free" ? false : newListing.allowOffers,
-      allowBuyNow: newListing.allowBuyNow,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 1000 * 60 * 60 * 24 * Number(newListing.expiresInDays),
+      allow_offers: newListing.priceType === "free" ? false : newListing.allowOffers,
+      allow_buy_now: newListing.allowBuyNow,
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * Number(newListing.expiresInDays)).toISOString(),
       status: "active",
       offers: [],
-      claimedBy: null,
+      claimed_by: null,
     };
 
-    setListings((prev) => [listing, ...prev]);
-    setNewListing({
-      title: "",
-      description: "",
-      priceType: "paid",
-      price: "",
-      pickup: "",
-      category: "General",
-      photoUrl: "",
-      allowOffers: true,
-      allowBuyNow: true,
-      expiresInDays: 14,
-    });
-    setNotice(`Listing posted: ${listing.title}`);
-    setTab("browse");
+    const { error } = await supabase.from("listings").insert(payload);
+
+    if (!error) {
+      setNewListing({
+        title: "",
+        description: "",
+        priceType: "paid",
+        price: "",
+        pickup: "",
+        category: "General",
+        photoUrl: "",
+        allowOffers: true,
+        allowBuyNow: true,
+        expiresInDays: 14,
+      });
+      setNotice(`Listing posted: ${payload.title}`);
+      setTab("browse");
+      loadListings();
+    } else {
+      setNotice(`Error: ${error.message}`);
+    }
   }
 
-  function buyNow(id: string) {
+  async function buyNow(id: string) {
     const item = listings.find((x) => x.id === id);
-    setListings((prev) =>
-      prev.map((entry) =>
-        entry.id === id
-          ? { ...entry, status: entry.priceType === "free" ? "claimed" : "sold", claimedBy: currentUser }
-          : entry,
-      ),
-    );
-    if (selectedListing?.id === id) {
-      setSelectedListing((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: prev.priceType === "free" ? "claimed" : "sold",
-              claimedBy: currentUser,
-            }
-          : null,
-      );
-    }
-    if (item) {
-      setNotice(item.priceType === "free" ? `You claimed: ${item.title}` : `You bought: ${item.title}`);
+    if (!item) return;
+
+    const nextStatus = item.price_type === "free" ? "claimed" : "sold";
+
+    const { error } = await supabase
+      .from("listings")
+      .update({ status: nextStatus, claimed_by: currentUser })
+      .eq("id", id);
+
+    if (!error) {
+      setSelectedListing(null);
+      setNotice(item.price_type === "free" ? `You claimed: ${item.title}` : `You bought: ${item.title}`);
+      loadListings();
+    } else {
+      setNotice(`Error: ${error.message}`);
     }
   }
 
-  function submitOffer(id: string) {
+  async function submitOffer(id: string) {
     const amount = Number(offerAmount);
     if (!amount) return;
+
+    const item = listings.find((x) => x.id === id);
+    if (!item) return;
 
     const nextOffer: Offer = {
       id: crypto.randomUUID(),
@@ -315,40 +234,53 @@ export default function Page() {
       createdAt: Date.now(),
     };
 
-    setListings((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, offers: [nextOffer, ...item.offers] } : item)),
-    );
+    const nextOffers = [nextOffer, ...(item.offers || [])];
 
-    if (selectedListing?.id === id) {
-      setSelectedListing((prev) => (prev ? { ...prev, offers: [nextOffer, ...prev.offers] } : null));
+    const { error } = await supabase
+      .from("listings")
+      .update({ offers: nextOffers })
+      .eq("id", id);
+
+    if (!error) {
+      setOfferAmount("");
+      setOfferNote("");
+      setNotice("Offer submitted.");
+      loadListings();
+    } else {
+      setNotice(`Error: ${error.message}`);
     }
-
-    setOfferAmount("");
-    setOfferNote("");
-    setNotice("Offer submitted.");
   }
 
-  function relist(id: string) {
-    setListings((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "active",
-              createdAt: Date.now(),
-              expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 14,
-            }
-          : item,
-      ),
-    );
-    setNotice("Listing relisted for 14 more days.");
+  async function relist(id: string) {
+    const { error } = await supabase
+      .from("listings")
+      .update({
+        status: "active",
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
+      })
+      .eq("id", id);
+
+    if (!error) {
+      setNotice("Listing relisted for 14 more days.");
+      loadListings();
+    } else {
+      setNotice(`Error: ${error.message}`);
+    }
   }
 
-  function deleteListing(id: string) {
+  async function deleteListing(id: string) {
     const item = listings.find((x) => x.id === id);
-    setListings((prev) => prev.filter((entry) => entry.id !== id));
-    if (selectedListing?.id === id) setSelectedListing(null);
-    if (item) setNotice(`Deleted: ${item.title}`);
+
+    const { error } = await supabase.from("listings").delete().eq("id", id);
+
+    if (!error) {
+      if (selectedListing?.id === id) setSelectedListing(null);
+      if (item) setNotice(`Deleted: ${item.title}`);
+      loadListings();
+    } else {
+      setNotice(`Error: ${error.message}`);
+    }
   }
 
   function resetFilters() {
@@ -400,9 +332,7 @@ export default function Page() {
               className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
             >
               {seedUsers.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
+                <option key={name} value={name}>{name}</option>
               ))}
             </select>
 
@@ -421,7 +351,7 @@ export default function Page() {
             </div>
 
             <p className="mt-4 text-sm text-slate-500">
-              This version works in the browser and is ready for a shared backend next.
+              Shared live data is now powered by Supabase.
             </p>
           </div>
         </section>
@@ -466,9 +396,7 @@ export default function Page() {
                   className="rounded-xl border border-slate-300 px-3 py-2"
                 >
                   {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
+                    <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
                 <select
@@ -480,87 +408,90 @@ export default function Page() {
                   <option value="paid">For sale</option>
                   <option value="free">Free</option>
                 </select>
-                <button
-                  onClick={resetFilters}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2"
-                >
+                <button onClick={resetFilters} className="rounded-xl border border-slate-300 bg-white px-4 py-2">
                   Reset
                 </button>
               </div>
             </div>
 
-            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {activeListings.length ? (
-                activeListings.map((item) => {
-                  const status = getStatus(item);
-                  const isOwner = item.seller === currentUser;
-                  return (
-                    <article key={item.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
-                      <div className="aspect-[4/3] bg-slate-100">
-                        <img src={item.photos?.[0]} alt={item.title} className="h-full w-full object-cover" />
-                      </div>
+            {loading ? (
+              <div className="rounded-3xl bg-white p-10 text-center text-slate-500 shadow-sm">
+                Loading listings...
+              </div>
+            ) : (
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {activeListings.length ? (
+                  activeListings.map((item) => {
+                    const status = getStatus(item);
+                    const isOwner = item.seller === currentUser;
+                    return (
+                      <article key={item.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                        <div className="aspect-[4/3] bg-slate-100">
+                          <img src={item.photos?.[0]} alt={item.title} className="h-full w-full object-cover" />
+                        </div>
 
-                      <div className="space-y-3 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-lg font-semibold leading-tight">{item.title}</h3>
-                            <div className="mt-1 text-sm text-slate-500">{item.seller}</div>
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="text-lg font-semibold leading-tight">{item.title}</h3>
+                              <div className="mt-1 text-sm text-slate-500">{item.seller}</div>
+                            </div>
+                            <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(status)}`}>
+                              {status}
+                            </span>
                           </div>
-                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(status)}`}>
-                            {status}
-                          </span>
-                        </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{item.category}</span>
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
-                            {item.priceType === "free" ? "Free" : money(item.price)}
-                          </span>
-                          {item.allowOffers && status === "active" ? (
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">Offers on</span>
-                          ) : null}
-                        </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{item.category}</span>
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
+                              {item.price_type === "free" ? "Free" : money(item.price)}
+                            </span>
+                            {item.allow_offers && status === "active" ? (
+                              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">Offers on</span>
+                            ) : null}
+                          </div>
 
-                        <p className="line-clamp-2 text-sm text-slate-600">{item.description}</p>
+                          <p className="line-clamp-2 text-sm text-slate-600">{item.description}</p>
 
-                        <div className="space-y-1 text-sm text-slate-500">
-                          <div>{item.pickup}</div>
-                          <div>{getRemainingText(item.expiresAt)}</div>
-                        </div>
+                          <div className="space-y-1 text-sm text-slate-500">
+                            <div>{item.pickup}</div>
+                            <div>{getRemainingText(item.expires_at)}</div>
+                          </div>
 
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            className="flex-1 rounded-xl border border-slate-300 px-4 py-2"
-                            onClick={() => setSelectedListing(item)}
-                          >
-                            View Details
-                          </button>
-                          {status === "active" && !isOwner && item.allowBuyNow ? (
+                          <div className="flex gap-2 pt-1">
                             <button
-                              className="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-white"
-                              onClick={() => buyNow(item.id)}
+                              className="flex-1 rounded-xl border border-slate-300 px-4 py-2"
+                              onClick={() => setSelectedListing(item)}
                             >
-                              {item.priceType === "free" ? "Claim It" : "Buy Now"}
+                              View Details
                             </button>
-                          ) : null}
+                            {status === "active" && !isOwner && item.allow_buy_now ? (
+                              <button
+                                className="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-white"
+                                onClick={() => buyNow(item.id)}
+                              >
+                                {item.price_type === "free" ? "Claim It" : "Buy Now"}
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })
-              ) : (
-                <div className="col-span-full rounded-3xl bg-white p-10 text-center text-slate-500 shadow-sm">
-                  <div className="text-base font-medium text-slate-900">No listings match those filters</div>
-                  <div className="mt-2 text-sm">Try clearing the filters or come back later.</div>
-                  <button
-                    onClick={resetFilters}
-                    className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2"
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              )}
-            </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full rounded-3xl bg-white p-10 text-center text-slate-500 shadow-sm">
+                    <div className="text-base font-medium text-slate-900">No listings match those filters</div>
+                    <div className="mt-2 text-sm">Try clearing the filters or come back later.</div>
+                    <button
+                      onClick={resetFilters}
+                      className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2"
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 
@@ -730,10 +661,10 @@ export default function Page() {
                               </span>
                             </div>
                             <div className="mt-1 text-sm text-slate-500">
-                              {item.priceType === "free" ? "Free" : money(item.price)} · {item.category}
+                              {item.price_type === "free" ? "Free" : money(item.price)} · {item.category}
                             </div>
-                            <div className="mt-2 text-sm text-slate-500">Expires: {formatDate(item.expiresAt)}</div>
-                            <div className="mt-1 text-sm text-slate-500">Offers received: {item.offers.length}</div>
+                            <div className="mt-2 text-sm text-slate-500">Expires: {formatDate(item.expires_at)}</div>
+                            <div className="mt-1 text-sm text-slate-500">Offers received: {(item.offers || []).length}</div>
                           </div>
 
                           <div className="flex flex-wrap gap-2">
@@ -777,7 +708,7 @@ export default function Page() {
                 <div>• Post an item with title, price or free status, pickup details, and expiration</div>
                 <div>• Claim an item immediately or submit an offer</div>
                 <div>• Expired items can be relisted with one click</div>
-                <div>• Data stays saved in the browser for this demo</div>
+                <div>• Shared listings now come from Supabase</div>
               </div>
             </div>
           </section>
@@ -812,14 +743,14 @@ export default function Page() {
                     </span>
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{selectedListing.category}</span>
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
-                      {selectedListing.priceType === "free" ? "Free" : money(selectedListing.price)}
+                      {selectedListing.price_type === "free" ? "Free" : money(selectedListing.price)}
                     </span>
                   </div>
 
                   <div className="mt-5 space-y-3 text-sm text-slate-500">
                     <div>Seller: {selectedListing.seller}</div>
                     <div>
-                      Expires: {formatDate(selectedListing.expiresAt)} ({getRemainingText(selectedListing.expiresAt)})
+                      Expires: {formatDate(selectedListing.expires_at)} ({getRemainingText(selectedListing.expires_at)})
                     </div>
                     <div>{selectedListing.pickup}</div>
                   </div>
@@ -828,18 +759,18 @@ export default function Page() {
 
                   {getStatus(selectedListing) === "active" && selectedListing.seller !== currentUser ? (
                     <div className="mt-6 space-y-5">
-                      {selectedListing.allowBuyNow ? (
+                      {selectedListing.allow_buy_now ? (
                         <button
                           className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white"
                           onClick={() => buyNow(selectedListing.id)}
                         >
-                          {selectedListing.priceType === "free"
+                          {selectedListing.price_type === "free"
                             ? "Claim item"
                             : `Buy now for ${money(selectedListing.price)}`}
                         </button>
                       ) : null}
 
-                      {selectedListing.allowOffers ? (
+                      {selectedListing.allow_offers ? (
                         <div className="rounded-2xl border border-slate-200 p-4">
                           <div className="font-medium">Make an offer</div>
                           <input
@@ -866,10 +797,10 @@ export default function Page() {
                     </div>
                   ) : null}
 
-                  {selectedListing.claimedBy ? (
+                  {selectedListing.claimed_by ? (
                     <div className="mt-5 rounded-2xl bg-slate-100 p-4 text-sm">
-                      This item has been {selectedListing.priceType === "free" ? "claimed" : "purchased"} by{" "}
-                      <span className="font-semibold">{selectedListing.claimedBy}</span>.
+                      This item has been {selectedListing.price_type === "free" ? "claimed" : "purchased"} by{" "}
+                      <span className="font-semibold">{selectedListing.claimed_by}</span>.
                     </div>
                   ) : null}
 
@@ -889,7 +820,7 @@ export default function Page() {
                               <div className="font-medium">{offer.by}</div>
                               <div>{money(offer.amount)}</div>
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">{formatDate(offer.createdAt)}</div>
+                            <div className="mt-1 text-xs text-slate-500">{new Date(offer.createdAt).toLocaleString()}</div>
                             {offer.note ? <div className="mt-2 text-slate-500">{offer.note}</div> : null}
                           </div>
                         ))
