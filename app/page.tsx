@@ -140,7 +140,9 @@ const [uploadingImage, setUploadingImage] = useState(false);
     });
   }, [listings, query, categoryFilter, typeFilter]);
 
-  const activeListings = filteredListings.filter((x) => getStatus(x) === "active");
+const activeListings = filteredListings.filter(
+  (x) => getStatus(x) === "active" && x.status !== "sold" && x.status !== "claimed"
+);
   const activeAll = listings.filter((x) => getStatus(x) === "active");
   const freeCount = activeAll.filter((x) => x.price_type === "free").length;
   const saleCount = activeAll.filter((x) => x.price_type === "paid").length;
@@ -282,24 +284,25 @@ if (!newListing.title || !newListing.description || !newListing.pickup) {
     }
   }
 
-  async function relist(id: string) {
-    const { error } = await supabase
-      .from("listings")
-      .update({
-        status: "active",
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
-      })
-      .eq("id", id);
+async function relist(id: string) {
+  const { error } = await supabase
+    .from("listings")
+    .update({
+      status: "active",
+      claimed_by: null,
+      offers: [],
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
+    })
+    .eq("id", id);
 
-    if (!error) {
-      setNotice("Listing relisted for 14 more days.");
-      loadListings();
-    } else {
-      setNotice(`Error: ${error.message}`);
-    }
+  if (!error) {
+    setNotice("Listing relisted for 14 more days.");
+    loadListings();
+  } else {
+    setNotice(`Error: ${error.message}`);
   }
-
+}
   async function deleteListing(id: string) {
     const item = listings.find((x) => x.id === id);
 
@@ -721,7 +724,12 @@ if (!newListing.title || !newListing.description || !newListing.pickup) {
                             <div className="mt-1 text-sm text-slate-500">
                               {item.price_type === "free" ? "Free" : money(item.price)} · {item.category}
                             </div>
-                            <div className="mt-2 text-sm text-slate-500">Expires: {formatDate(item.expires_at)}</div>
+<div className="mt-2 text-sm text-slate-500">
+  Expires: {formatDate(item.expires_at)}
+  {status === "expired" ? (
+    <span className="ml-2 font-medium text-amber-700">Expired</span>
+  ) : null}
+</div>
                             <div className="mt-1 text-sm text-slate-500">Offers received: {(item.offers || []).length}</div>
                           </div>
 
