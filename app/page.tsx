@@ -538,17 +538,28 @@ async function uploadListingImage(file: File) {
 
 <div>
   <label className="block text-sm font-medium">Photo upload</label>
-  <input
-    type="file"
-    accept="image/*"
-    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-    onChange={async (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        await uploadListingImage(file);
-      }
-    }}
-  />
+<input
+  type="file"
+  accept=".jpg,.jpeg,.png,.webp"
+  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+  onChange={async (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    // basic file type guard
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      setNotice("Please upload JPG, JPEG, PNG, or WebP images.");
+      return;
+    }
+
+    await uploadListingImage(file);
+  }}
+/>
+<p className="mt-2 text-sm text-slate-500">
+  Use JPG, JPEG, PNG, or WebP. iPhone HEIC photos are not supported yet.
+</p>
   {uploadingImage ? (
     <p className="mt-2 text-sm text-slate-500">Uploading image...</p>
   ) : null}
