@@ -1,24 +1,41 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Plus, Clock3, RefreshCcw, Tag, MapPin, User, Gavel, ShoppingCart, Trash2, CheckCircle2, Sparkles, AlertCircle, Package, HandCoins } from "lucide-react";
+"use client";
 
-const STORAGE_KEY = "family-marketplace-mvp-v2";
+import { useEffect, useMemo, useState } from "react";
+
+type Offer = {
+  id: string;
+  by: string;
+  amount: number;
+  note: string;
+  createdAt: number;
+};
+
+type Listing = {
+  id: string;
+  title: string;
+  description: string;
+  priceType: "paid" | "free";
+  price: number;
+  pickup: string;
+  seller: string;
+  category: string;
+  photos: string[];
+  allowOffers: boolean;
+  allowBuyNow: boolean;
+  createdAt: number;
+  expiresAt: number;
+  status: "active" | "expired" | "sold" | "claimed";
+  offers: Offer[];
+  claimedBy: string | null;
+};
+
+const STORAGE_KEY = "family-marketplace-mvp-v3";
 const APP_NAME = "Family First Marketplace";
 const APP_TAGLINE = "Give family first shot before it gets donated or consigned.";
 
 const seedUsers = ["Jared", "Ashley", "Mom", "Dad", "Aunt Lisa", "Cousin Ben"];
 
-const seedListings = [
+const seedListings: Listing[] = [
   {
     id: crypto.randomUUID(),
     title: "Solid wood coffee table",
@@ -28,7 +45,9 @@ const seedListings = [
     pickup: "Front porch pickup in Highland Lake",
     seller: "Mom",
     category: "Furniture",
-    photos: ["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop"],
+    photos: [
+      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?q=80&w=1200&auto=format&fit=crop",
+    ],
     allowOffers: true,
     allowBuyNow: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 6,
@@ -54,7 +73,9 @@ const seedListings = [
     pickup: "Pickup in Birmingham next week or I can bring to family lunch.",
     seller: "Ashley",
     category: "Kids",
-    photos: ["https://images.unsplash.com/photo-1519238359922-989348752efb?q=80&w=1200&auto=format&fit=crop"],
+    photos: [
+      "https://images.unsplash.com/photo-1519238359922-989348752efb?q=80&w=1200&auto=format&fit=crop",
+    ],
     allowOffers: false,
     allowBuyNow: true,
     createdAt: Date.now() - 1000 * 60 * 90,
@@ -72,7 +93,9 @@ const seedListings = [
     pickup: "Porch pickup only",
     seller: "Dad",
     category: "Music",
-    photos: ["https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=1200&auto=format&fit=crop"],
+    photos: [
+      "https://images.unsplash.com/photo-1510915361894-db8b60106cb1?q=80&w=1200&auto=format&fit=crop",
+    ],
     allowOffers: true,
     allowBuyNow: true,
     createdAt: Date.now() - 1000 * 60 * 60 * 24 * 12,
@@ -83,15 +106,18 @@ const seedListings = [
   },
 ];
 
-function money(value) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value || 0);
+function money(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(value || 0);
 }
 
-function formatDate(ts) {
+function formatDate(ts: number) {
   return new Date(ts).toLocaleString();
 }
 
-function getRemainingText(expiresAt) {
+function getRemainingText(expiresAt: number) {
   const diff = expiresAt - Date.now();
   if (diff <= 0) return "Expired";
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -101,32 +127,31 @@ function getRemainingText(expiresAt) {
   return `${hours}h ${mins}m left`;
 }
 
-function getStatus(listing) {
+function getStatus(listing: Listing) {
   if (listing.status === "sold") return "sold";
   if (listing.status === "claimed") return "claimed";
   if (listing.expiresAt <= Date.now()) return "expired";
   return "active";
 }
 
-function statusTone(status) {
-  if (status === "active") return "default";
-  return "secondary";
+function badgeClass(status: string) {
+  if (status === "active") return "bg-emerald-100 text-emerald-800";
+  if (status === "sold") return "bg-slate-200 text-slate-700";
+  if (status === "claimed") return "bg-blue-100 text-blue-800";
+  return "bg-amber-100 text-amber-800";
 }
 
-function priceLabel(item) {
-  return item.priceType === "free" ? "Free" : money(item.price);
-}
-
-export default function FamilyMarketplaceMVP() {
+export default function Page() {
   const [currentUser, setCurrentUser] = useState("Jared");
-  const [listings, setListings] = useState(seedListings);
+  const [listings, setListings] = useState<Listing[]>(seedListings);
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [selectedListing, setSelectedListing] = useState(null);
+  const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [offerAmount, setOfferAmount] = useState("");
   const [offerNote, setOfferNote] = useState("");
   const [notice, setNotice] = useState("");
+  const [tab, setTab] = useState<"browse" | "create" | "manage">("browse");
   const [newListing, setNewListing] = useState({
     title: "",
     description: "",
@@ -170,7 +195,7 @@ export default function FamilyMarketplaceMVP() {
             return { ...item, status: "expired" };
           }
           return item;
-        })
+        }),
       );
     }, 30000);
     return () => clearInterval(timer);
@@ -187,11 +212,13 @@ export default function FamilyMarketplaceMVP() {
         .join(" ")
         .toLowerCase()
         .includes(query.toLowerCase());
+
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
       const matchesType =
         typeFilter === "all" ||
         (typeFilter === "free" && item.priceType === "free") ||
         (typeFilter === "paid" && item.priceType === "paid");
+
       return matchesQuery && matchesCategory && matchesType;
     });
   }, [listings, query, categoryFilter, typeFilter]);
@@ -202,18 +229,21 @@ export default function FamilyMarketplaceMVP() {
   const saleCount = activeAll.filter((x) => x.priceType === "paid").length;
   const myListings = listings.filter((x) => x.seller === currentUser);
   const expiringSoon = listings.filter(
-    (x) => getStatus(x) === "active" && x.expiresAt - Date.now() < 1000 * 60 * 60 * 24 * 2
+    (x) => getStatus(x) === "active" && x.expiresAt - Date.now() < 1000 * 60 * 60 * 24 * 2,
   );
-  const myOpenOffers = listings.reduce((sum, item) => sum + item.offers.filter((o) => o.by === currentUser).length, 0);
+  const myOpenOffers = listings.reduce(
+    (sum, item) => sum + item.offers.filter((o) => o.by === currentUser).length,
+    0,
+  );
 
   function createListing() {
     if (!newListing.title || !newListing.description || !newListing.pickup) return;
 
-    const listing = {
+    const listing: Listing = {
       id: crypto.randomUUID(),
       title: newListing.title,
       description: newListing.description,
-      priceType: newListing.priceType,
+      priceType: newListing.priceType as "paid" | "free",
       price: newListing.priceType === "free" ? 0 : Number(newListing.price || 0),
       pickup: newListing.pickup,
       seller: currentUser,
@@ -245,51 +275,60 @@ export default function FamilyMarketplaceMVP() {
       expiresInDays: 14,
     });
     setNotice(`Listing posted: ${listing.title}`);
+    setTab("browse");
   }
 
-  function buyNow(id) {
+  function buyNow(id: string) {
     const item = listings.find((x) => x.id === id);
     setListings((prev) =>
       prev.map((entry) =>
         entry.id === id
           ? { ...entry, status: entry.priceType === "free" ? "claimed" : "sold", claimedBy: currentUser }
-          : entry
-      )
+          : entry,
+      ),
     );
     if (selectedListing?.id === id) {
-      setSelectedListing((prev) => ({
-        ...prev,
-        status: selectedListing.priceType === "free" ? "claimed" : "sold",
-        claimedBy: currentUser,
-      }));
+      setSelectedListing((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: prev.priceType === "free" ? "claimed" : "sold",
+              claimedBy: currentUser,
+            }
+          : null,
+      );
     }
     if (item) {
       setNotice(item.priceType === "free" ? `You claimed: ${item.title}` : `You bought: ${item.title}`);
     }
   }
 
-  function submitOffer(id) {
+  function submitOffer(id: string) {
     const amount = Number(offerAmount);
     if (!amount) return;
-    const nextOffer = {
+
+    const nextOffer: Offer = {
       id: crypto.randomUUID(),
       by: currentUser,
       amount,
       note: offerNote,
       createdAt: Date.now(),
     };
+
     setListings((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, offers: [nextOffer, ...item.offers] } : item))
+      prev.map((item) => (item.id === id ? { ...item, offers: [nextOffer, ...item.offers] } : item)),
     );
+
     if (selectedListing?.id === id) {
-      setSelectedListing((prev) => ({ ...prev, offers: [nextOffer, ...prev.offers] }));
+      setSelectedListing((prev) => (prev ? { ...prev, offers: [nextOffer, ...prev.offers] } : null));
     }
+
     setOfferAmount("");
     setOfferNote("");
     setNotice("Offer submitted.");
   }
 
-  function relist(id) {
+  function relist(id: string) {
     setListings((prev) =>
       prev.map((item) =>
         item.id === id
@@ -299,13 +338,13 @@ export default function FamilyMarketplaceMVP() {
               createdAt: Date.now(),
               expiresAt: Date.now() + 1000 * 60 * 60 * 24 * 14,
             }
-          : item
-      )
+          : item,
+      ),
     );
     setNotice("Listing relisted for 14 more days.");
   }
 
-  function deleteListing(id) {
+  function deleteListing(id: string) {
     const item = listings.find((x) => x.id === id);
     setListings((prev) => prev.filter((entry) => entry.id !== id));
     if (selectedListing?.id === id) setSelectedListing(null);
@@ -318,383 +357,471 @@ export default function FamilyMarketplaceMVP() {
     setTypeFilter("all");
   }
 
-  function ListingCard({ item }) {
-    const status = getStatus(item);
-    const isOwner = item.seller === currentUser;
-    return (
-      <Card className="overflow-hidden rounded-2xl border-0 shadow-sm transition-transform duration-200 hover:-translate-y-0.5">
-        <div className="aspect-[4/3] overflow-hidden bg-muted">
-          <img src={item.photos?.[0]} alt={item.title} className="h-full w-full object-cover" />
-        </div>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold leading-tight">{item.title}</h3>
-              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" /> {item.seller}
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+        <section className="mb-6 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
+          <div className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+              <div>
+                <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                  Private family-only marketplace
+                </div>
+                <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{APP_NAME}</h1>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600 md:text-base">{APP_TAGLINE}</p>
+                <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
+                  <div>✓ Post an item</div>
+                  <div>✓ Let family claim or offer</div>
+                  <div>✓ Auto-expire stale listings</div>
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: "Active now", value: activeAll.length },
+                  { label: "Free items", value: freeCount },
+                  { label: "For sale", value: saleCount },
+                  { label: "Expiring soon", value: expiringSoon.length },
+                ].map((stat) => (
+                  <div key={stat.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <div className="text-xs text-slate-500">{stat.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
-            <Badge variant={statusTone(status)}>{status}</Badge>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{item.category}</Badge>
-            <Badge variant="outline">{priceLabel(item)}</Badge>
-            {item.allowOffers && status === "active" ? <Badge variant="outline">Offers on</Badge> : null}
-          </div>
+          <div className="rounded-3xl bg-white p-6 shadow-sm">
+            <label className="text-sm text-slate-500">Viewing as</label>
+            <select
+              value={currentUser}
+              onChange={(e) => setCurrentUser(e.target.value)}
+              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
+            >
+              {seedUsers.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
 
-          <p className="line-clamp-2 text-sm text-muted-foreground">{item.description}</p>
-
-          <div className="space-y-1 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /> {item.pickup}</div>
-            <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" /> {getRemainingText(item.expiresAt)}</div>
-          </div>
-
-          <div className="flex gap-2 pt-1">
-            <Button className="flex-1 rounded-xl" variant="outline" onClick={() => setSelectedListing(item)}>
-              View Details
-            </Button>
-            {status === "active" && !isOwner && item.allowBuyNow ? (
-              <Button className="flex-1 rounded-xl" onClick={() => buyNow(item.id)}>
-                {item.priceType === "free" ? "Claim It" : "Buy Now"}
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
-        <div className="mb-6 grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-          <Card className="rounded-3xl border-0 shadow-sm">
-            <CardContent className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+              <div className="text-sm font-medium">Quick view for {currentUser}</div>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm text-slate-500">
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
-                    <Sparkles className="h-3.5 w-3.5" /> Private family-only marketplace
-                  </div>
-                  <h1 className="mt-3 text-3xl font-bold tracking-tight md:text-4xl">{APP_NAME}</h1>
-                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">{APP_TAGLINE}</p>
-                  <div className="mt-4 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                    <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Post an item</div>
-                    <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Let family claim or offer</div>
-                    <div className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" /> Auto-expire stale listings</div>
-                  </div>
+                  <div className="text-lg font-semibold text-slate-900">{myListings.length}</div>
+                  <div>My listings</div>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                  <Card className="rounded-2xl shadow-none">
-                    <CardContent className="p-4">
-                      <div className="text-2xl font-bold">{activeAll.length}</div>
-                      <div className="text-xs text-muted-foreground">Active now</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="rounded-2xl shadow-none">
-                    <CardContent className="p-4">
-                      <div className="text-2xl font-bold">{freeCount}</div>
-                      <div className="text-xs text-muted-foreground">Free items</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="rounded-2xl shadow-none">
-                    <CardContent className="p-4">
-                      <div className="text-2xl font-bold">{saleCount}</div>
-                      <div className="text-xs text-muted-foreground">For sale</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="rounded-2xl shadow-none">
-                    <CardContent className="p-4">
-                      <div className="text-2xl font-bold">{expiringSoon.length}</div>
-                      <div className="text-xs text-muted-foreground">Expiring soon</div>
-                    </CardContent>
-                  </Card>
+                <div>
+                  <div className="text-lg font-semibold text-slate-900">{myOpenOffers}</div>
+                  <div>My offers</div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card className="rounded-3xl border-0 shadow-sm">
-            <CardContent className="flex h-full flex-col justify-between p-6">
-              <div>
-                <Label className="text-sm text-muted-foreground">Viewing as</Label>
-                <Select value={currentUser} onValueChange={setCurrentUser}>
-                  <SelectTrigger className="mt-2 rounded-xl">
-                    <SelectValue placeholder="Choose family member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {seedUsers.map((name) => (
-                      <SelectItem value={name} key={name}>{name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm font-medium">Quick view for {currentUser}</div>
-                <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
-                  <div>
-                    <div className="text-lg font-semibold text-slate-900">{myListings.length}</div>
-                    <div>My listings</div>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-slate-900">{myOpenOffers}</div>
-                    <div>My offers</div>
-                  </div>
-                </div>
-              </div>
-
-              <p className="mt-4 text-sm text-muted-foreground">
-                This version is polished for family use, but still runs locally in the browser. Next, we convert it into a shared live app.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            <p className="mt-4 text-sm text-slate-500">
+              This version works in the browser and is ready for a shared backend next.
+            </p>
+          </div>
+        </section>
 
         {notice ? (
-          <div className="mb-5 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <CheckCircle2 className="h-4 w-4" /> {notice}
+          <div className="mb-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {notice}
           </div>
         ) : null}
 
-        <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 rounded-2xl p-1 md:w-[560px]">
-            <TabsTrigger value="browse" className="rounded-xl">Browse Listings</TabsTrigger>
-            <TabsTrigger value="create" className="rounded-xl">Post an Item</TabsTrigger>
-            <TabsTrigger value="manage" className="rounded-xl">My Listings</TabsTrigger>
-          </TabsList>
+        <div className="mb-6 flex flex-wrap gap-2">
+          {[
+            ["browse", "Browse Listings"],
+            ["create", "Post an Item"],
+            ["manage", "My Listings"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setTab(value as "browse" | "create" | "manage")}
+              className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                tab === value ? "bg-slate-900 text-white" : "bg-white text-slate-700 shadow-sm"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-          <TabsContent value="browse" className="space-y-5">
-            <Card className="rounded-3xl shadow-sm">
-              <CardContent className="grid gap-3 p-4 md:grid-cols-[1fr_220px_180px_auto] md:p-5">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by item, seller, or category"
-                    className="rounded-xl pl-10"
-                  />
-                </div>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="rounded-xl">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All items</SelectItem>
-                    <SelectItem value="paid">For sale</SelectItem>
-                    <SelectItem value="free">Free</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" className="rounded-xl" onClick={resetFilters}>Reset</Button>
-              </CardContent>
-            </Card>
+        {tab === "browse" && (
+          <section className="space-y-5">
+            <div className="rounded-3xl bg-white p-4 shadow-sm md:p-5">
+              <div className="grid gap-3 md:grid-cols-[1fr_220px_180px_auto]">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by item, seller, or category"
+                  className="rounded-xl border border-slate-300 px-3 py-2"
+                />
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="rounded-xl border border-slate-300 px-3 py-2"
+                >
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="rounded-xl border border-slate-300 px-3 py-2"
+                >
+                  <option value="all">All items</option>
+                  <option value="paid">For sale</option>
+                  <option value="free">Free</option>
+                </select>
+                <button
+                  onClick={resetFilters}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
 
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {activeListings.length ? (
-                activeListings.map((item) => <ListingCard key={item.id} item={item} />)
+                activeListings.map((item) => {
+                  const status = getStatus(item);
+                  const isOwner = item.seller === currentUser;
+                  return (
+                    <article key={item.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                      <div className="aspect-[4/3] bg-slate-100">
+                        <img src={item.photos?.[0]} alt={item.title} className="h-full w-full object-cover" />
+                      </div>
+
+                      <div className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-semibold leading-tight">{item.title}</h3>
+                            <div className="mt-1 text-sm text-slate-500">{item.seller}</div>
+                          </div>
+                          <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(status)}`}>
+                            {status}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{item.category}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
+                            {item.priceType === "free" ? "Free" : money(item.price)}
+                          </span>
+                          {item.allowOffers && status === "active" ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">Offers on</span>
+                          ) : null}
+                        </div>
+
+                        <p className="line-clamp-2 text-sm text-slate-600">{item.description}</p>
+
+                        <div className="space-y-1 text-sm text-slate-500">
+                          <div>{item.pickup}</div>
+                          <div>{getRemainingText(item.expiresAt)}</div>
+                        </div>
+
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            className="flex-1 rounded-xl border border-slate-300 px-4 py-2"
+                            onClick={() => setSelectedListing(item)}
+                          >
+                            View Details
+                          </button>
+                          {status === "active" && !isOwner && item.allowBuyNow ? (
+                            <button
+                              className="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-white"
+                              onClick={() => buyNow(item.id)}
+                            >
+                              {item.priceType === "free" ? "Claim It" : "Buy Now"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
               ) : (
-                <Card className="col-span-full rounded-3xl">
-                  <CardContent className="flex flex-col items-center justify-center gap-3 p-10 text-center text-muted-foreground">
-                    <Package className="h-8 w-8" />
-                    <div className="text-base font-medium text-slate-900">No listings match those filters</div>
-                    <div className="max-w-md text-sm">Try clearing the filters or come back later when someone posts something new.</div>
-                    <Button variant="outline" className="rounded-xl" onClick={resetFilters}>Clear filters</Button>
-                  </CardContent>
-                </Card>
+                <div className="col-span-full rounded-3xl bg-white p-10 text-center text-slate-500 shadow-sm">
+                  <div className="text-base font-medium text-slate-900">No listings match those filters</div>
+                  <div className="mt-2 text-sm">Try clearing the filters or come back later.</div>
+                  <button
+                    onClick={resetFilters}
+                    className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2"
+                  >
+                    Clear filters
+                  </button>
+                </div>
               )}
             </div>
-          </TabsContent>
+          </section>
+        )}
 
-          <TabsContent value="create">
-            <Card className="rounded-3xl shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-2xl"><Plus className="h-5 w-5" /> Post an item for the family</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-muted-foreground">
-                    Keep it simple: add a clear title, a short honest description, and pickup instructions. Listings expire automatically so stale items do not pile up.
-                  </div>
+        {tab === "create" && (
+          <section className="rounded-3xl bg-white shadow-sm">
+            <div className="border-b border-slate-200 p-6">
+              <h2 className="text-2xl font-semibold">Post an item for the family</h2>
+            </div>
+
+            <div className="grid gap-6 p-6 md:grid-cols-2">
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                  Keep it simple: add a clear title, a short honest description, and pickup instructions.
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium">Item title</label>
+                  <input
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                    value={newListing.title}
+                    onChange={(e) => setNewListing({ ...newListing, title: e.target.value })}
+                    placeholder="Coffee table, stroller, drill set..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium">Description</label>
+                  <textarea
+                    className="mt-2 min-h-[140px] w-full rounded-xl border border-slate-300 px-3 py-2"
+                    value={newListing.description}
+                    onChange={(e) => setNewListing({ ...newListing, description: e.target.value })}
+                    placeholder="Condition, size, brand, wear, and anything family should know before claiming it."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium">Photo URL</label>
+                  <input
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                    value={newListing.photoUrl}
+                    onChange={(e) => setNewListing({ ...newListing, photoUrl: e.target.value })}
+                    placeholder="Paste an image URL for this MVP"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <Label>Item title</Label>
-                    <Input className="mt-2 rounded-xl" value={newListing.title} onChange={(e) => setNewListing({ ...newListing, title: e.target.value })} placeholder="Coffee table, stroller, drill set..." />
+                    <label className="block text-sm font-medium">Listing type</label>
+                    <select
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.priceType}
+                      onChange={(e) => setNewListing({ ...newListing, priceType: e.target.value })}
+                    >
+                      <option value="paid">For sale</option>
+                      <option value="free">Free</option>
+                    </select>
                   </div>
+
                   <div>
-                    <Label>Description</Label>
-                    <Textarea className="mt-2 min-h-[140px] rounded-xl" value={newListing.description} onChange={(e) => setNewListing({ ...newListing, description: e.target.value })} placeholder="Condition, size, brand, wear, and anything family should know before claiming it." />
-                  </div>
-                  <div>
-                    <Label>Photo URL</Label>
-                    <Input className="mt-2 rounded-xl" value={newListing.photoUrl} onChange={(e) => setNewListing({ ...newListing, photoUrl: e.target.value })} placeholder="Paste an image URL for this MVP" />
+                    <label className="block text-sm font-medium">Category</label>
+                    <input
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.category}
+                      onChange={(e) => setNewListing({ ...newListing, category: e.target.value })}
+                      placeholder="Furniture"
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <Label>Listing type</Label>
-                      <Select value={newListing.priceType} onValueChange={(value) => setNewListing({ ...newListing, priceType: value })}>
-                        <SelectTrigger className="mt-2 rounded-xl"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="paid">For sale</SelectItem>
-                          <SelectItem value="free">Free</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Category</Label>
-                      <Input className="mt-2 rounded-xl" value={newListing.category} onChange={(e) => setNewListing({ ...newListing, category: e.target.value })} placeholder="Furniture" />
-                    </div>
+                {newListing.priceType === "paid" ? (
+                  <div>
+                    <label className="block text-sm font-medium">Asking price</label>
+                    <input
+                      type="number"
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.price}
+                      onChange={(e) => setNewListing({ ...newListing, price: e.target.value })}
+                      placeholder="75"
+                    />
                   </div>
+                ) : null}
 
-                  {newListing.priceType === "paid" ? (
-                    <div>
-                      <Label>Asking price</Label>
-                      <Input className="mt-2 rounded-xl" type="number" value={newListing.price} onChange={(e) => setNewListing({ ...newListing, price: e.target.value })} placeholder="75" />
-                    </div>
-                  ) : null}
+                <div>
+                  <label className="block text-sm font-medium">Pickup details</label>
+                  <textarea
+                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                    value={newListing.pickup}
+                    onChange={(e) => setNewListing({ ...newListing, pickup: e.target.value })}
+                    placeholder="Porch pickup, town, available days, meetup options..."
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-sm font-medium">Expires in days</label>
+                    <input
+                      type="number"
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.expiresInDays}
+                      onChange={(e) =>
+                        setNewListing({ ...newListing, expiresInDays: Number(e.target.value) })
+                      }
+                    />
+                  </div>
 
                   <div>
-                    <Label>Pickup details</Label>
-                    <Textarea className="mt-2 rounded-xl" value={newListing.pickup} onChange={(e) => setNewListing({ ...newListing, pickup: e.target.value })} placeholder="Porch pickup, town, available days, meetup options, or whether you can bring it to the next family gathering." />
+                    <label className="block text-sm font-medium">Buy now / claim</label>
+                    <select
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.allowBuyNow ? "yes" : "no"}
+                      onChange={(e) =>
+                        setNewListing({ ...newListing, allowBuyNow: e.target.value === "yes" })
+                      }
+                    >
+                      <option value="yes">Enabled</option>
+                      <option value="no">Disabled</option>
+                    </select>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <div>
-                      <Label>Expires in days</Label>
-                      <Input className="mt-2 rounded-xl" type="number" value={newListing.expiresInDays} onChange={(e) => setNewListing({ ...newListing, expiresInDays: e.target.value })} />
-                    </div>
-                    <div>
-                      <Label>Buy now / claim</Label>
-                      <Select value={newListing.allowBuyNow ? "yes" : "no"} onValueChange={(v) => setNewListing({ ...newListing, allowBuyNow: v === "yes" })}>
-                        <SelectTrigger className="mt-2 rounded-xl"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Enabled</SelectItem>
-                          <SelectItem value="no">Disabled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Offers</Label>
-                      <Select value={newListing.allowOffers ? "yes" : "no"} onValueChange={(v) => setNewListing({ ...newListing, allowOffers: v === "yes" })}>
-                        <SelectTrigger className="mt-2 rounded-xl"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="yes">Enabled</SelectItem>
-                          <SelectItem value="no">Disabled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium">Offers</label>
+                    <select
+                      className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+                      value={newListing.allowOffers ? "yes" : "no"}
+                      onChange={(e) =>
+                        setNewListing({ ...newListing, allowOffers: e.target.value === "yes" })
+                      }
+                    >
+                      <option value="yes">Enabled</option>
+                      <option value="no">Disabled</option>
+                    </select>
                   </div>
-
-                  <Button className="w-full rounded-2xl" onClick={createListing}>Publish listing</Button>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
 
-          <TabsContent value="manage">
-            <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-              <Card className="rounded-3xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>My listings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {myListings.length ? myListings.map((item) => {
+                <button
+                  className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white"
+                  onClick={createListing}
+                >
+                  Publish listing
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {tab === "manage" && (
+          <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-3xl bg-white shadow-sm">
+              <div className="border-b border-slate-200 p-6">
+                <h2 className="text-xl font-semibold">My listings</h2>
+              </div>
+
+              <div className="space-y-4 p-6">
+                {myListings.length ? (
+                  myListings.map((item) => {
                     const status = getStatus(item);
                     return (
-                      <div key={item.id} className="rounded-2xl border bg-white p-4">
+                      <div key={item.id} className="rounded-2xl border border-slate-200 bg-white p-4">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold">{item.title}</h3>
-                              <Badge variant="outline">{status}</Badge>
+                              <span className={`rounded-full px-2 py-1 text-xs ${badgeClass(status)}`}>
+                                {status}
+                              </span>
                             </div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              {priceLabel(item)} · {item.category}
+                            <div className="mt-1 text-sm text-slate-500">
+                              {item.priceType === "free" ? "Free" : money(item.price)} · {item.category}
                             </div>
-                            <div className="mt-2 text-sm text-muted-foreground">Expires: {formatDate(item.expiresAt)}</div>
-                            <div className="mt-1 text-sm text-muted-foreground">Offers received: {item.offers.length}</div>
+                            <div className="mt-2 text-sm text-slate-500">Expires: {formatDate(item.expiresAt)}</div>
+                            <div className="mt-1 text-sm text-slate-500">Offers received: {item.offers.length}</div>
                           </div>
+
                           <div className="flex flex-wrap gap-2">
                             {status === "expired" ? (
-                              <Button variant="outline" className="rounded-xl" onClick={() => relist(item.id)}>
-                                <RefreshCcw className="mr-2 h-4 w-4" /> Relist
-                              </Button>
+                              <button
+                                className="rounded-xl border border-slate-300 px-4 py-2"
+                                onClick={() => relist(item.id)}
+                              >
+                                Relist
+                              </button>
                             ) : null}
-                            <Button variant="outline" className="rounded-xl" onClick={() => setSelectedListing(item)}>View</Button>
-                            <Button variant="destructive" className="rounded-xl" onClick={() => deleteListing(item.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </Button>
+                            <button
+                              className="rounded-xl border border-slate-300 px-4 py-2"
+                              onClick={() => setSelectedListing(item)}
+                            >
+                              View
+                            </button>
+                            <button
+                              className="rounded-xl bg-red-600 px-4 py-2 text-white"
+                              onClick={() => deleteListing(item.id)}
+                            >
+                              Delete
+                            </button>
                           </div>
                         </div>
                       </div>
                     );
-                  }) : (
-                    <div className="rounded-2xl border border-dashed p-8 text-center text-muted-foreground">
-                      You have not posted anything yet.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl shadow-sm">
-                <CardHeader>
-                  <CardTitle>How this version works</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-muted-foreground">
-                  <div>• Browse current family listings</div>
-                  <div>• Post an item with title, price or free status, pickup details, and expiration</div>
-                  <div>• Claim an item immediately or submit an offer</div>
-                  <div>• Expired items can be relisted with one click</div>
-                  <div>• Data stays saved in the browser for this demo</div>
-                  <Separator className="my-3" />
-                  <div className="font-medium text-slate-900">To actually go live for the family today:</div>
-                  <div>• Add shared backend + database</div>
-                  <div>• Add simple invite-only sign-in</div>
-                  <div>• Replace photo URL input with image upload</div>
-                  <div>• Deploy to Vercel or Netlify</div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      <Dialog open={!!selectedListing} onOpenChange={(open) => !open && setSelectedListing(null)}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-hidden rounded-3xl p-0">
-          {selectedListing ? (
-            <div className="grid max-h-[90vh] md:grid-cols-[1.1fr_0.9fr]">
-              <div className="bg-black/5">
-                <img src={selectedListing.photos?.[0]} alt={selectedListing.title} className="h-full max-h-[420px] w-full object-cover md:max-h-[90vh]" />
+                  })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
+                    You have not posted anything yet.
+                  </div>
+                )}
               </div>
-              <ScrollArea className="max-h-[90vh]">
-                <div className="p-6">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl">{selectedListing.title}</DialogTitle>
-                  </DialogHeader>
+            </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Badge variant={statusTone(getStatus(selectedListing))}>{getStatus(selectedListing)}</Badge>
-                    <Badge variant="outline">{selectedListing.category}</Badge>
-                    <Badge variant="outline">{priceLabel(selectedListing)}</Badge>
-                    {selectedListing.allowOffers && getStatus(selectedListing) === "active" ? <Badge variant="outline">Offers enabled</Badge> : null}
+            <div className="rounded-3xl bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold">How this version works</h2>
+              <div className="mt-4 space-y-3 text-sm text-slate-500">
+                <div>• Browse current family listings</div>
+                <div>• Post an item with title, price or free status, pickup details, and expiration</div>
+                <div>• Claim an item immediately or submit an offer</div>
+                <div>• Expired items can be relisted with one click</div>
+                <div>• Data stays saved in the browser for this demo</div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {selectedListing ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-3xl bg-white">
+              <div className="grid md:grid-cols-[1.1fr_0.9fr]">
+                <div className="bg-slate-100">
+                  <img
+                    src={selectedListing.photos?.[0]}
+                    alt={selectedListing.title}
+                    className="h-full max-h-[420px] w-full object-cover md:max-h-[90vh]"
+                  />
+                </div>
+
+                <div className="p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-2xl font-semibold">{selectedListing.title}</h2>
+                    <button
+                      onClick={() => setSelectedListing(null)}
+                      className="rounded-full border border-slate-300 px-3 py-1 text-sm"
+                    >
+                      Close
+                    </button>
                   </div>
 
-                  <div className="mt-5 space-y-3 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground"><User className="h-4 w-4" /> Seller: {selectedListing.seller}</div>
-                    <div className="flex items-center gap-2 text-muted-foreground"><Clock3 className="h-4 w-4" /> Expires: {formatDate(selectedListing.expiresAt)} ({getRemainingText(selectedListing.expiresAt)})</div>
-                    <div className="flex items-center gap-2 text-muted-foreground"><MapPin className="h-4 w-4" /> {selectedListing.pickup}</div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${badgeClass(getStatus(selectedListing))}`}>
+                      {getStatus(selectedListing)}
+                    </span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{selectedListing.category}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-xs">
+                      {selectedListing.priceType === "free" ? "Free" : money(selectedListing.price)}
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-3 text-sm text-slate-500">
+                    <div>Seller: {selectedListing.seller}</div>
+                    <div>
+                      Expires: {formatDate(selectedListing.expiresAt)} ({getRemainingText(selectedListing.expiresAt)})
+                    </div>
+                    <div>{selectedListing.pickup}</div>
                   </div>
 
                   <p className="mt-5 text-sm leading-6 text-slate-700">{selectedListing.description}</p>
@@ -702,70 +829,83 @@ export default function FamilyMarketplaceMVP() {
                   {getStatus(selectedListing) === "active" && selectedListing.seller !== currentUser ? (
                     <div className="mt-6 space-y-5">
                       {selectedListing.allowBuyNow ? (
-                        <Button className="w-full rounded-2xl" onClick={() => buyNow(selectedListing.id)}>
-                          <ShoppingCart className="mr-2 h-4 w-4" />
-                          {selectedListing.priceType === "free" ? "Claim item" : `Buy now for ${money(selectedListing.price)}`}
-                        </Button>
+                        <button
+                          className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white"
+                          onClick={() => buyNow(selectedListing.id)}
+                        >
+                          {selectedListing.priceType === "free"
+                            ? "Claim item"
+                            : `Buy now for ${money(selectedListing.price)}`}
+                        </button>
                       ) : null}
 
                       {selectedListing.allowOffers ? (
-                        <Card className="rounded-2xl shadow-none">
-                          <CardContent className="space-y-3 p-4">
-                            <div className="flex items-center gap-2 font-medium"><HandCoins className="h-4 w-4" /> Make an offer</div>
-                            <Input type="number" value={offerAmount} onChange={(e) => setOfferAmount(e.target.value)} placeholder="Offer amount" className="rounded-xl" />
-                            <Textarea value={offerNote} onChange={(e) => setOfferNote(e.target.value)} placeholder="Optional note: pickup timing, bundle request, or any extra context." className="rounded-xl" />
-                            <Button className="w-full rounded-xl" variant="outline" onClick={() => submitOffer(selectedListing.id)}>
-                              Submit offer
-                            </Button>
-                          </CardContent>
-                        </Card>
+                        <div className="rounded-2xl border border-slate-200 p-4">
+                          <div className="font-medium">Make an offer</div>
+                          <input
+                            type="number"
+                            value={offerAmount}
+                            onChange={(e) => setOfferAmount(e.target.value)}
+                            placeholder="Offer amount"
+                            className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2"
+                          />
+                          <textarea
+                            value={offerNote}
+                            onChange={(e) => setOfferNote(e.target.value)}
+                            placeholder="Optional note: pickup timing, bundle request, or extra context."
+                            className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2"
+                          />
+                          <button
+                            className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-2"
+                            onClick={() => submitOffer(selectedListing.id)}
+                          >
+                            Submit offer
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}
 
                   {selectedListing.claimedBy ? (
                     <div className="mt-5 rounded-2xl bg-slate-100 p-4 text-sm">
-                      This item has been {selectedListing.priceType === "free" ? "claimed" : "purchased"} by <span className="font-semibold">{selectedListing.claimedBy}</span>.
+                      This item has been {selectedListing.priceType === "free" ? "claimed" : "purchased"} by{" "}
+                      <span className="font-semibold">{selectedListing.claimedBy}</span>.
                     </div>
                   ) : null}
 
                   {selectedListing.seller === currentUser && selectedListing.offers?.length > 0 ? (
-                    <div className="mt-5 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                      <AlertCircle className="h-4 w-4" /> You have {selectedListing.offers.length} offer{selectedListing.offers.length === 1 ? "" : "s"} on this item.
+                    <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                      You have {selectedListing.offers.length} offer{selectedListing.offers.length === 1 ? "" : "s"} on this item.
                     </div>
                   ) : null}
 
-                  <Separator className="my-5" />
-
-                  <div>
-                    <div className="mb-3 flex items-center gap-2 font-medium"><Tag className="h-4 w-4" /> Offer history</div>
+                  <div className="mt-6">
+                    <div className="mb-3 font-medium">Offer history</div>
                     <div className="space-y-3">
-                      {selectedListing.offers?.length ? selectedListing.offers.map((offer) => (
-                        <div key={offer.id} className="rounded-2xl border p-3 text-sm">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="font-medium">{offer.by}</div>
-                            <div>{money(offer.amount)}</div>
+                      {selectedListing.offers?.length ? (
+                        selectedListing.offers.map((offer) => (
+                          <div key={offer.id} className="rounded-2xl border border-slate-200 p-3 text-sm">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="font-medium">{offer.by}</div>
+                              <div>{money(offer.amount)}</div>
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">{formatDate(offer.createdAt)}</div>
+                            {offer.note ? <div className="mt-2 text-slate-500">{offer.note}</div> : null}
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">{formatDate(offer.createdAt)}</div>
-                          {offer.note ? <div className="mt-2 text-muted-foreground">{offer.note}</div> : null}
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                          No offers yet.
                         </div>
-                      )) : (
-                        <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">No offers yet.</div>
                       )}
                     </div>
                   </div>
                 </div>
-              </ScrollArea>
+              </div>
             </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-          </a>
-        </div>
-      </main>
-    </div>
+          </div>
+        ) : null}
+      </div>
+    </main>
   );
 }
