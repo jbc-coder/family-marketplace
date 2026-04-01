@@ -94,7 +94,7 @@ export default function Page() {
     allowBuyNow: true,
     expiresInDays: 14,
   });
-
+const [uploadingImage, setUploadingImage] = useState(false);
   async function loadListings() {
     setLoading(true);
     const { data, error } = await supabase
@@ -152,7 +152,36 @@ export default function Page() {
     (sum, item) => sum + (item.offers || []).filter((o) => o.by === currentUser).length,
     0
   );
+async function uploadListingImage(file: File) {
+  setUploadingImage(true);
 
+  const fileExt = file.name.split(".").pop();
+  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+  const filePath = fileName;
+
+  const { error: uploadError } = await supabase.storage
+    .from("listing-images")
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    setUploadingImage(false);
+    setNotice(`Image upload failed: ${uploadError.message}`);
+    return;
+  }
+
+  const { data } = supabase.storage.from("listing-images").getPublicUrl(filePath);
+
+  setNewListing((prev) => ({
+    ...prev,
+    photoUrl: data.publicUrl,
+  }));
+
+  setUploadingImage(false);
+  setNotice("Image uploaded.");
+}
   async function createListing() {
     if (!newListing.title || !newListing.description || !newListing.pickup) return;
 
@@ -507,16 +536,32 @@ export default function Page() {
                   Keep it simple: add a clear title, a short honest description, and pickup instructions.
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium">Item title</label>
-                  <input
-                    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
-                    value={newListing.title}
-                    onChange={(e) => setNewListing({ ...newListing, title: e.target.value })}
-                    placeholder="Coffee table, stroller, drill set..."
-                  />
-                </div>
-
+<div>
+  <label className="block text-sm font-medium">Photo upload</label>
+  <input
+    type="file"
+    accept="image/*"
+    className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2"
+    onChange={async (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await uploadListingImage(file);
+      }
+    }}
+  />
+  {uploadingImage ? (
+    <p className="mt-2 text-sm text-slate-500">Uploading image...</p>
+  ) : null}
+  {newListing.photoUrl ? (
+    <div className="mt-3">
+      <img
+        src={newListing.photoUrl}
+        alt="Preview"
+        className="h-32 w-32 rounded-xl object-cover"
+      />
+    </div>
+  ) : null}
+</div>
                 <div>
                   <label className="block text-sm font-medium">Description</label>
                   <textarea
@@ -628,12 +673,13 @@ export default function Page() {
                   </div>
                 </div>
 
-                <button
-                  className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white"
-                  onClick={createListing}
-                >
-                  Publish listing
-                </button>
+<button
+  className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-white disabled:opacity-50"
+  onClick={createListing}
+  disabled={uploadingImage}
+>
+  {uploadingImage ? "Uploading image..." : "Publish listing"}
+</button>
               </div>
             </div>
           </section>
